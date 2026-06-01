@@ -3,6 +3,7 @@ import { createServer } from "node:http";
 import { extname, join, normalize } from "node:path";
 import {
   archiveTask,
+  getActivityLogs,
   getShoes,
   getArchivedTasks,
   logSync,
@@ -66,6 +67,12 @@ async function handleApi(req, res, pathname) {
 
   if (req.method === "GET" && pathname === "/api/tasks/archived") {
     sendJson(res, 200, getArchivedTasks());
+    return;
+  }
+
+  if (req.method === "GET" && pathname === "/api/activity") {
+    const url = new URL(req.url, `http://${req.headers.host}`);
+    sendJson(res, 200, getActivityLogs(url.searchParams.get("limit")));
     return;
   }
 

@@ -568,13 +568,15 @@ tr:last-child td {
 }
 
 .action-list,
-.pricing-board {
+.pricing-board,
+.activity-list {
   display: grid;
   gap: 10px;
 }
 
 .action-item,
-.pricing-item {
+.pricing-item,
+.activity-item {
   display: grid;
   grid-template-columns: minmax(0, 1.15fr) minmax(0, 1fr) auto;
   gap: 16px;
@@ -588,15 +590,65 @@ tr:last-child td {
 .action-item h4,
 .action-item p,
 .pricing-item h4,
-.pricing-item p {
+.pricing-item p,
+.activity-item h4,
+.activity-item p {
   margin: 0;
 }
 
 .action-item p,
-.pricing-item p {
+.pricing-item p,
+.activity-item p {
   margin-top: 4px;
   color: var(--muted);
   font-size: 13px;
+}
+
+.activity-item {
+  grid-template-columns: minmax(0, 1fr) minmax(260px, 0.75fr);
+  align-items: start;
+}
+
+.activity-main {
+  display: grid;
+  gap: 5px;
+}
+
+.activity-type {
+  width: fit-content;
+  padding: 3px 8px;
+  border-radius: 999px;
+  background: var(--soft);
+  color: var(--accent);
+  font-size: 12px;
+  font-weight: 800;
+}
+
+.activity-details {
+  display: grid;
+  gap: 6px;
+  margin: 0;
+  padding: 0;
+  list-style: none;
+}
+
+.activity-details li {
+  display: grid;
+  grid-template-columns: 88px minmax(0, 1fr);
+  gap: 8px;
+  align-items: baseline;
+  color: var(--muted);
+  font-size: 13px;
+}
+
+.activity-details strong {
+  color: var(--ink);
+  font-weight: 700;
+  overflow-wrap: anywhere;
+}
+
+.activity-context {
+  align-self: center;
 }
 
 .task-actions {
@@ -811,7 +863,8 @@ tr:last-child td {
 
   .platform-row,
   .action-item,
-  .pricing-item {
+  .pricing-item,
+  .activity-item {
     grid-template-columns: 1fr;
   }
 }

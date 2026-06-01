@@ -40,6 +40,7 @@ const ACTIVE_PRICE_STATUSES = ["draft", "listed", "offer"];
 
 let shoes = [];
 let archivedTaskKeys = new Set();
+let activityLogs = [];
 let editingId = null;
 let currentView = "inventory";
 let density = "grid";
@@ -235,6 +236,7 @@ async function loadLegacyShoes() {
 async function load() {
   shoes = (await apiRequest("/api/shoes")).map(normalizeShoe);
   archivedTaskKeys = new Set((await apiRequest("/api/tasks/archived")).map((task) => task.taskKey));
+  activityLogs = await apiRequest("/api/activity?limit=80");
   if (!shoes.length) {
     const legacyShoes = await loadLegacyShoes();
     if (legacyShoes.length) {
@@ -245,6 +247,10 @@ async function load() {
       localStorage.removeItem(STORAGE_KEY);
     }
   }
+}
+
+async function refreshActivity() {
+  activityLogs = await apiRequest("/api/activity?limit=80");
 }
 
 async function saveShoeToApi(shoe) {
@@ -293,6 +299,8 @@ async function syncEbay() {
   try {
     const result = await apiRequest("/api/sync/ebay", { method: "POST" });
     elements.ebayStatusText.textContent = result.message || result.status;
+    await refreshActivity();
+    render();
   } catch (error) {
     elements.ebayStatusText.textContent = `同步失败: ${error.message}`;
   } finally {
@@ -306,6 +314,7 @@ async function archiveTask(taskKey, shoeId, action) {
     body: JSON.stringify({ taskKey, shoeId, action }),
   });
   archivedTaskKeys.add(taskKey);
+  await refreshActivity();
   render();
 }
 
@@ -356,6 +365,7 @@ async function seedData() {
     }),
   ];
   shoes = await replaceShoesViaApi(seeded);
+  await refreshActivity();
   render();
 }
 
@@ -376,6 +386,7 @@ function renderMetrics() {
   $("#navInventoryCount").textContent = shoes.length;
   $("#navActionCount").textContent = todos.length;
   $("#navPricingCount").textContent = shoes.filter((shoe) => getMinAsk(shoe) && shoe.market).length;
+  $("#navActivityCount").textContent = activityLogs.length;
 }
 
 function renderInventory() {
@@ -555,11 +566,87 @@ function renderPricing() {
     : `<div class="empty-state"><h3>还没有价格数据</h3><p>填你的 Ask 和最高买家出价，这里就会显示差距。</p></div>`;
 }
 
+function renderActivity() {
+  $("#activityList").innerHTML = activityLogs.length
+    ? activityLogs.map(renderActivityItem).join("")
+    : `<div class="empty-state"><h3>还没有活动记录</h3><p>新增或修改球鞋后，这里会自动留下记录。</p></div>`;
+}
+
+function renderActivityItem(item) {
+  const details = Array.isArray(item.details?.changes) ? item.details.changes : [];
+  const detailRows = details
+    .slice(0, 4)
+    .map(
+      (change) => `
+        <li>
+          <span>${escapeHtml(change.label || change.field)}</span>
+          <strong>${escapeHtml(formatActivityValue(change.before))} -> ${escapeHtml(formatActivityValue(change.after))}</strong>
+        </li>
+      `,
+    )
+    .join("");
+
+  return `
+    <article class="activity-item">
+      <div class="activity-main">
+        <span class="activity-type">${escapeHtml(activityActionLabel(item.action))}</span>
+        <h4>${escapeHtml(item.summary || item.entityLabel || "活动记录")}</h4>
+        <p>${escapeHtml(formatDateTime(item.createdAt))}</p>
+      </div>
+      ${
+        detailRows
+          ? `<ul class="activity-details">${detailRows}</ul>`
+          : `<p class="activity-context">${escapeHtml(item.entityLabel || item.entityType || "系统")}</p>`
+      }
+    </article>
+  `;
+}
+
+function activityActionLabel(action) {
+  return {
+    created: "新增",
+    updated: "修改",
+    deleted: "删除",
+    imported: "导入",
+    done: "完成待办",
+    ignored: "忽略待办",
+    auth_updated: "授权",
+    sync_ok: "同步",
+    sync_error: "同步失败",
+  }[action] || action || "记录";
+}
+
+function formatActivityValue(value) {
+  if (value === undefined || value === null || value === "") return "-";
+  if (value === "old") return "旧照片";
+  if (value === "new") return "新照片";
+  const labels = {
+    not_listed: "未挂",
+    draft: "草稿",
+    listed: "已挂",
+    offer: "询价",
+    sold: "已售",
+  };
+  return labels[value] || String(value);
+}
+
+function formatDateTime(value) {
+  const date = new Date(value);
+  if (Number.isNaN(date.getTime())) return value || "-";
+  return new Intl.DateTimeFormat("zh-CN", {
+    month: "2-digit",
+    day: "2-digit",
+    hour: "2-digit",
+    minute: "2-digit",
+  }).format(date);
+}
+
 function render() {
   renderMetrics();
   renderInventory();
   renderActions();
   renderPricing();
+  renderActivity();
 }
 
 function daysSince(dateString) {
@@ -765,6 +852,7 @@ async function importData(file) {
   const data = JSON.parse(text);
   if (!Array.isArray(data)) throw new Error("Invalid import file");
   shoes = await replaceShoesViaApi(data.map(normalizeShoe));
+  await refreshActivity();
   render();
 }
 
@@ -781,6 +869,7 @@ function bindEvents() {
     try {
       await deleteShoeFromApi(editingId);
       shoes = shoes.filter((item) => item.id !== editingId);
+      await refreshActivity();
       closeDrawer();
       render();
     } catch {
@@ -794,6 +883,7 @@ function bindEvents() {
     try {
       const saved = await saveShoeToApi(shoe);
       shoes = editingId ? shoes.map((item) => (item.id === editingId ? saved : item)) : [saved, ...shoes];
+      await refreshActivity();
       closeDrawer();
       render();
     } catch {

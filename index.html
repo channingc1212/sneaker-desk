@@ -30,6 +30,10 @@
             <span>定价</span>
             <strong id="navPricingCount">0</strong>
           </button>
+          <button class="nav-item" data-view="activity" title="Activity">
+            <span>活动</span>
+            <strong id="navActivityCount">0</strong>
+          </button>
         </nav>
 
         <div class="sidebar-block">
@@ -171,6 +175,14 @@
             <p>把你的挂牌价和当前最高买家出价分开看，避免把 bid 当成市场成交价。</p>
           </div>
           <div id="pricingBoard" class="pricing-board"></div>
+        </section>
+
+        <section id="viewActivity" class="view">
+          <div class="panel-heading">
+            <h3>活动记录</h3>
+            <p>自动记录新增、修改、删除、待办归档和平台同步，方便回看自己做过什么。</p>
+          </div>
+          <div id="activityList" class="activity-list"></div>
         </section>
       </main>
     </div>
