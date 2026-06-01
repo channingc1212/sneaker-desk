@@ -1,0 +1,328 @@
+<!doctype html>
+<html lang="zh-CN">
+  <head>
+    <meta charset="UTF-8" />
+    <meta name="viewport" content="width=device-width, initial-scale=1.0" />
+    <title>CC Sneaker Platform</title>
+    <link rel="stylesheet" href="./styles.css" />
+  </head>
+  <body>
+    <div class="app-shell">
+      <aside class="sidebar">
+        <div class="brand">
+          <div class="brand-mark">CC</div>
+          <div>
+            <h1>CC Sneaker Platform</h1>
+            <p>CC 的球鞋库存平台</p>
+          </div>
+        </div>
+
+        <nav class="nav-list" aria-label="Views">
+          <button class="nav-item active" data-view="inventory" title="Inventory">
+            <span>库存</span>
+            <strong id="navInventoryCount">0</strong>
+          </button>
+          <button class="nav-item" data-view="actions" title="Actions">
+            <span>待办</span>
+            <strong id="navActionCount">0</strong>
+          </button>
+          <button class="nav-item" data-view="pricing" title="Pricing">
+            <span>定价</span>
+            <strong id="navPricingCount">0</strong>
+          </button>
+        </nav>
+
+        <div class="sidebar-block">
+          <label for="searchInput">搜索</label>
+          <input id="searchInput" type="search" placeholder="鞋名、尺码、货号、平台" />
+        </div>
+
+        <div class="sidebar-block">
+          <label for="statusFilter">状态</label>
+          <select id="statusFilter">
+            <option value="all">全部</option>
+            <option value="draft">未整理</option>
+            <option value="photo">待拍照</option>
+            <option value="listed">已挂牌</option>
+            <option value="offer">有询价</option>
+            <option value="sold">已售出</option>
+          </select>
+        </div>
+
+        <div class="sidebar-block">
+          <label for="platformFilter">平台</label>
+          <select id="platformFilter">
+            <option value="all">全部平台</option>
+            <option value="eBay">eBay</option>
+            <option value="Facebook">Facebook</option>
+            <option value="StockX">StockX</option>
+            <option value="Local">Local</option>
+          </select>
+        </div>
+
+        <div class="sidebar-block ebay-panel">
+          <label>eBay</label>
+          <p id="ebayStatusText">Checking...</p>
+          <div class="ebay-actions">
+            <button class="secondary-action" id="ebayConnectButton" type="button">授权</button>
+            <button class="secondary-action" id="ebaySyncButton" type="button">同步</button>
+          </div>
+        </div>
+
+        <div class="sidebar-actions">
+          <button class="secondary-action" id="importButton" title="从 JSON 备份恢复库存">导入备份</button>
+          <button class="secondary-action" id="exportButton" title="导出 JSON 备份">导出备份</button>
+          <input id="importFile" type="file" accept="application/json" hidden />
+        </div>
+        <p class="backup-help">备份/恢复 SQLite 里的库存数据。</p>
+      </aside>
+
+      <main class="workspace">
+        <header class="topbar">
+          <div>
+            <p class="eyebrow">CC Sneaker Command Center</p>
+            <h2>球鞋库存平台</h2>
+          </div>
+          <div class="topbar-actions">
+            <button class="ghost-button" id="seedButton" title="Load sample data">示例</button>
+            <button class="primary-button" id="addShoeButton" title="Add sneaker">新增球鞋</button>
+          </div>
+        </header>
+
+        <section class="metrics-grid" aria-label="Summary">
+          <div class="metric">
+            <span>库存</span>
+            <strong id="metricInventory">0</strong>
+          </div>
+          <div class="metric">
+            <span>挂牌中</span>
+            <strong id="metricListed">0</strong>
+          </div>
+          <div class="metric">
+            <span>挂牌总额</span>
+            <strong id="metricAsk">$0</strong>
+          </div>
+          <div class="metric">
+            <span>预计净收入</span>
+            <strong id="metricProjectedNet">$0</strong>
+          </div>
+          <div class="metric">
+            <span>已售净收入</span>
+            <strong id="metricSoldNet">$0</strong>
+          </div>
+          <div class="metric">
+            <span>需处理</span>
+            <strong id="metricTodo">0</strong>
+          </div>
+        </section>
+
+        <section class="toolbar">
+          <div class="segmented" role="tablist" aria-label="Card density">
+            <button class="segment active" data-density="grid">卡片</button>
+            <button class="segment" data-density="table">表格</button>
+          </div>
+          <div class="sort-row">
+            <label for="sortSelect">排序</label>
+            <select id="sortSelect">
+              <option value="updatedDesc">最近更新</option>
+              <option value="askDesc">要价最高</option>
+              <option value="gapDesc">价差最大</option>
+              <option value="nameAsc">名称 A-Z</option>
+            </select>
+          </div>
+        </section>
+
+        <section id="viewInventory" class="view active-view">
+          <div id="inventoryGrid" class="inventory-grid"></div>
+          <div id="inventoryTable" class="inventory-table-wrap" hidden>
+            <table>
+              <thead>
+                <tr>
+                  <th>球鞋</th>
+                  <th>状态</th>
+                  <th>尺码</th>
+                  <th>最低挂牌</th>
+                  <th>最高买家出价</th>
+                  <th>Ask-Bid 差</th>
+                  <th>下一步</th>
+                </tr>
+              </thead>
+              <tbody id="inventoryTableBody"></tbody>
+            </table>
+          </div>
+          <div id="emptyState" class="empty-state" hidden>
+            <h3>先放进第一双鞋</h3>
+            <p>建议从 10 双最想处理的开始，别一口气把 100 双都录完。</p>
+            <button class="primary-button" id="emptyAddButton">新增球鞋</button>
+          </div>
+        </section>
+
+        <section id="viewActions" class="view">
+          <div class="panel-heading">
+            <h3>今天值得处理的事</h3>
+            <p>按“能推进销售”的优先级排，不追求自动化。</p>
+          </div>
+          <div id="actionsList" class="action-list"></div>
+        </section>
+
+        <section id="viewPricing" class="view">
+          <div class="panel-heading">
+            <h3>定价观察</h3>
+            <p>把你的挂牌价和当前最高买家出价分开看，避免把 bid 当成市场成交价。</p>
+          </div>
+          <div id="pricingBoard" class="pricing-board"></div>
+        </section>
+      </main>
+    </div>
+
+    <div id="drawerBackdrop" class="drawer-backdrop" hidden></div>
+    <aside id="shoeDrawer" class="drawer" aria-hidden="true">
+      <form id="shoeForm">
+        <div class="drawer-header">
+          <div>
+            <p class="eyebrow">Sneaker record</p>
+            <h2 id="drawerTitle">新增球鞋</h2>
+          </div>
+          <button type="button" class="icon-button" id="closeDrawerButton" title="Close">x</button>
+        </div>
+
+        <div class="form-grid">
+          <label class="field span-2">
+            <span>照片</span>
+            <div class="photo-field">
+              <img id="photoPreview" src="./assets/sample-sneaker.png" alt="Sneaker preview" />
+              <input id="photoInput" type="file" accept="image/*" />
+            </div>
+          </label>
+
+          <label class="field span-2">
+            <span>鞋名</span>
+            <input id="nameInput" required placeholder="Nike Kobe 6 Protro Reverse Grinch" />
+          </label>
+
+          <label class="field">
+            <span>品牌</span>
+            <input id="brandInput" placeholder="Nike / Jordan / Adidas" />
+          </label>
+
+          <label class="field">
+            <span>型号 / 货号</span>
+            <input id="skuInput" placeholder="FV4921-600" />
+          </label>
+
+          <label class="field">
+            <span>尺码</span>
+            <input id="sizeInput" placeholder="US 10.5" />
+          </label>
+
+          <label class="field">
+            <span>状态</span>
+            <select id="conditionInput">
+              <option value="New">New</option>
+              <option value="VNDS">VNDS</option>
+              <option value="Used">Used</option>
+              <option value="Beat">Beat</option>
+            </select>
+          </label>
+
+          <label class="field">
+            <span>购入成本</span>
+            <input id="costInput" type="number" min="0" step="1" placeholder="180" />
+          </label>
+
+          <label class="field">
+            <span>心理底价</span>
+            <input id="floorInput" type="number" min="0" step="1" placeholder="240" />
+          </label>
+
+          <label class="field">
+            <span>最高买家出价</span>
+            <input id="marketInput" type="number" min="0" step="1" placeholder="Sell Now / highest bid" />
+          </label>
+
+          <label class="field">
+            <span>价格检查日</span>
+            <input id="checkedInput" type="date" />
+          </label>
+
+          <div class="market-tools span-2">
+            <span>查市场价</span>
+            <div>
+              <a data-market-link="ebay" target="_blank" rel="noreferrer">eBay Sold</a>
+              <a data-market-link="stockx" target="_blank" rel="noreferrer">StockX</a>
+              <a data-market-link="goat" target="_blank" rel="noreferrer">GOAT</a>
+              <a data-market-link="google" target="_blank" rel="noreferrer">Google</a>
+            </div>
+          </div>
+
+          <label class="field span-2">
+            <span>下一步</span>
+            <input id="nextActionInput" placeholder="拍外底照片 / 降 eBay 价格 / 回复 Facebook 买家" />
+          </label>
+
+          <label class="field span-2">
+            <span>备注</span>
+            <textarea id="notesInput" rows="3" placeholder="瑕疵、盒子情况、local 店报价、买家记录"></textarea>
+          </label>
+        </div>
+
+        <div class="platform-editor">
+          <div class="platform-editor-header">
+            <h3>平台挂牌</h3>
+            <span>改状态和价格，就能看到估算到手</span>
+          </div>
+          <div id="platformRows"></div>
+        </div>
+
+        <div class="drawer-footer">
+          <button type="button" class="danger-button" id="deleteButton">删除</button>
+          <div>
+            <button type="button" class="ghost-button" id="cancelButton">取消</button>
+            <button type="submit" class="primary-button">保存</button>
+          </div>
+        </div>
+      </form>
+    </aside>
+
+    <template id="platformRowTemplate">
+      <div class="platform-row">
+        <label>
+          <span class="platform-name"></span>
+          <select class="platform-status">
+            <option value="not_listed">未挂</option>
+            <option value="draft">草稿</option>
+            <option value="listed">已挂</option>
+            <option value="offer">有询价</option>
+            <option value="sold">已售</option>
+          </select>
+        </label>
+        <label>
+          <span>价格</span>
+          <input class="platform-price" type="number" min="0" step="1" />
+        </label>
+        <label>
+          <span>费用 %</span>
+          <input class="platform-fee" type="number" min="0" step="0.01" />
+        </label>
+        <label>
+          <span>固定费</span>
+          <input class="platform-fixed" type="number" min="0" step="0.01" />
+        </label>
+        <label>
+          <span>运费成本</span>
+          <input class="platform-ship" type="number" min="0" step="0.01" />
+        </label>
+        <label class="link-cell">
+          <span>链接 / 店名</span>
+          <input class="platform-link" />
+        </label>
+        <div class="platform-net">
+          <span>估算到手</span>
+          <strong>-</strong>
+        </div>
+      </div>
+    </template>
+
+    <script src="./app.js"></script>
+  </body>
+</html>
