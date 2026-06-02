@@ -66,7 +66,7 @@ Node 本地后端
 ## eBay setup
 
 1. 在 eBay Developer Portal 创建 Application Keys。
-2. 先建议用 Sandbox，确认流程后再换 Production。
+2. 如果要同步真实账号，用 Production keyset；Sandbox 只适合测试账号。
 3. 在 User Tokens / eBay Sign-In 设置 RuName。
 4. Auth Accepted URL 填：
 
@@ -85,6 +85,38 @@ EBAY_RUNAME=...
 ```
 
 7. 重启 `npm start`，点左侧 eBay 面板里的 `授权`。
+
+### Production keyset compliance
+
+eBay Production keyset 启用前，需要完成 Marketplace Account Deletion / Account Closure Notifications。
+本项目已经提供 webhook：
+
+```text
+/api/ebay/account-deletion
+```
+
+部署到 Vercel 后，eBay Developer Portal 里填：
+
+```text
+Notification Endpoint URL:
+https://<your-vercel-domain>/api/ebay/account-deletion
+```
+
+同时在 Vercel Environment Variables 里设置同样的 endpoint 和一个 32-80 字符 verification token：
+
+```text
+EBAY_ACCOUNT_DELETION_ENDPOINT=https://<your-vercel-domain>/api/ebay/account-deletion
+EBAY_ACCOUNT_DELETION_VERIFICATION_TOKEN=<your-32-to-80-char-token>
+```
+
+在 eBay Developer Portal 的 Verification token 字段填同一个 token。
+eBay 会用 `GET ?challenge_code=...` 验证 endpoint，本项目会按 eBay 要求返回：
+
+```json
+{ "challengeResponse": "sha256(challengeCode + verificationToken + endpoint)" }
+```
+
+后续 eBay 发送 account deletion POST notification 时，endpoint 会立即返回 `200 OK`，满足 eBay 的 acknowledgement 要求。
 
 当前 eBay adapter 已支持 OAuth、token refresh、seller policy 读取、inventory item upsert、offer draft 创建入口。真正 publish active listing 前，还需要配置：
 

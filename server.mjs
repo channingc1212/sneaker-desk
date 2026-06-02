@@ -22,6 +22,7 @@ import {
 } from "./server/adapters/ebay.mjs";
 import { syncGoat } from "./server/adapters/goat.mjs";
 import { syncStockX } from "./server/adapters/stockx.mjs";
+import { handleEbayAccountDeletion } from "./server/ebayAccountDeletion.mjs";
 
 const PORT = Number(process.env.PORT || 5173);
 const HOST = process.env.HOST || "127.0.0.1";
@@ -83,6 +84,11 @@ async function handleApi(req, res, pathname) {
 
   if (req.method === "GET" && pathname === "/api/ebay/status") {
     sendJson(res, 200, getEbayStatus());
+    return;
+  }
+
+  if (pathname === "/api/ebay/account-deletion") {
+    await handleEbayAccountDeletion(req, res);
     return;
   }
 

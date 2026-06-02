@@ -38,6 +38,8 @@ export function getConfig() {
       returnPolicyId: env.EBAY_RETURN_POLICY_ID || "",
       categoryId: env.EBAY_DEFAULT_CATEGORY_ID || "15709",
       conditionDefault: env.EBAY_DEFAULT_CONDITION || "USED_EXCELLENT",
+      accountDeletionEndpoint: env.EBAY_ACCOUNT_DELETION_ENDPOINT || "",
+      accountDeletionVerificationToken: env.EBAY_ACCOUNT_DELETION_VERIFICATION_TOKEN || "",
     },
   };
 }

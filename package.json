@@ -7,6 +7,6 @@
     "start": "node server.mjs"
   },
   "engines": {
-    "node": ">=25"
+    "node": ">=22"
   }
 }
