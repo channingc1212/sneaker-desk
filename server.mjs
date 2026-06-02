@@ -48,12 +48,45 @@ function sendJson(res, status, payload) {
   res.end(body);
 }
 
+function sendHtml(res, status, html) {
+  res.writeHead(status, {
+    "Content-Type": "text/html; charset=utf-8",
+    "Content-Length": Buffer.byteLength(html),
+  });
+  res.end(html);
+}
+
+function redirect(res, location) {
+  res.writeHead(302, { Location: location });
+  res.end();
+}
+
 async function readJson(req) {
   const chunks = [];
   for await (const chunk of req) chunks.push(chunk);
   if (!chunks.length) return {};
   return JSON.parse(Buffer.concat(chunks).toString("utf8"));
 }
+
+const privacyPolicyHtml = `<!doctype html>
+<html lang="en">
+  <head>
+    <meta charset="utf-8" />
+    <meta name="viewport" content="width=device-width, initial-scale=1" />
+    <title>CC Sneaker Platform Privacy Policy</title>
+    <style>
+      body { font-family: system-ui, -apple-system, BlinkMacSystemFont, "Segoe UI", sans-serif; max-width: 760px; margin: 48px auto; padding: 0 20px; line-height: 1.6; color: #18211f; }
+      h1 { line-height: 1.15; }
+    </style>
+  </head>
+  <body>
+    <h1>CC Sneaker Platform Privacy Policy</h1>
+    <p>CC Sneaker Platform is a personal inventory tool used by its owner to manage sneaker listings and resale workflow.</p>
+    <p>The production application stores inventory and listing workflow data locally on the owner's computer. This public endpoint is used for eBay developer compliance and OAuth redirect relay only.</p>
+    <p>Marketplace account deletion notifications from eBay are acknowledged by the compliance endpoint. If eBay user data is stored in local records, the owner is responsible for deleting applicable local records when required.</p>
+    <p>Contact: chicheng@outlook.com</p>
+  </body>
+</html>`;
 
 async function handleApi(req, res, pathname) {
   if (req.method === "GET" && pathname === "/api/health") {
@@ -118,6 +151,16 @@ async function handleApi(req, res, pathname) {
     await exchangeCodeForToken(url.searchParams.get("code"));
     res.writeHead(200, { "Content-Type": "text/html; charset=utf-8" });
     res.end(`<h1>eBay connected</h1><p>You can close this tab and return to Sneaker Desk.</p><p><a href="/">Back to Sneaker Desk</a></p>`);
+    return;
+  }
+
+  if (req.method === "GET" && pathname === "/api/ebay/oauth/relay") {
+    const url = new URL(req.url, `http://${req.headers.host}`);
+    const localCallback = new URL("http://127.0.0.1:5173/api/ebay/oauth/callback");
+    for (const [key, value] of url.searchParams.entries()) {
+      localCallback.searchParams.append(key, value);
+    }
+    redirect(res, localCallback.toString());
     return;
   }
 
@@ -201,6 +244,10 @@ function serveStatic(req, res, pathname) {
 const server = createServer(async (req, res) => {
   try {
     const url = new URL(req.url, `http://${req.headers.host}`);
+    if (req.method === "GET" && url.pathname === "/privacy") {
+      sendHtml(res, 200, privacyPolicyHtml);
+      return;
+    }
     if (url.pathname.startsWith("/api/")) {
       await handleApi(req, res, url.pathname);
       return;
