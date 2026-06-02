@@ -4,3 +4,4 @@ node_modules/
 .DS_Store
 assets/listings/
 mobile-qa.png
+.vercel
