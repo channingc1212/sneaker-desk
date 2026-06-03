@@ -170,26 +170,6 @@ button {
   line-height: 1.35;
 }
 
-.ebay-panel {
-  padding: 12px;
-  border: 1px solid rgba(255, 255, 255, 0.1);
-  border-radius: 8px;
-  background: rgba(255, 255, 255, 0.04);
-}
-
-.ebay-panel p {
-  margin: 0;
-  color: rgba(246, 247, 242, 0.78);
-  font-size: 13px;
-  line-height: 1.35;
-}
-
-.ebay-actions {
-  display: grid;
-  grid-template-columns: 1fr 1fr;
-  gap: 8px;
-}
-
 .workspace {
   min-width: 0;
   padding: 28px;

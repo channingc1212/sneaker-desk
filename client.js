@@ -65,9 +65,6 @@ const elements = {
   photoPreview: $("#photoPreview"),
   photoInput: $("#photoInput"),
   importFile: $("#importFile"),
-  ebayStatusText: $("#ebayStatusText"),
-  ebayConnectButton: $("#ebayConnectButton"),
-  ebaySyncButton: $("#ebaySyncButton"),
 };
 
 function money(value) {
@@ -268,44 +265,6 @@ async function replaceShoesViaApi(nextShoes) {
     method: "POST",
     body: JSON.stringify(nextShoes),
   })).map(normalizeShoe);
-}
-
-async function loadEbayStatus() {
-  try {
-    const status = await apiRequest("/api/ebay/status");
-    if (!status.configured) {
-      elements.ebayStatusText.textContent = "API 待配置，可先手动录入 eBay 状态";
-      elements.ebayStatusText.title = `缺配置: ${status.missing.join(", ")}`;
-      elements.ebayConnectButton.disabled = true;
-      elements.ebaySyncButton.disabled = true;
-      return;
-    }
-    elements.ebayConnectButton.disabled = false;
-    elements.ebaySyncButton.disabled = !status.hasToken;
-    const tokenText = status.hasToken ? "已授权" : "未授权";
-    const policyText = status.policiesConfigured ? "可创建 offer" : "缺 policies";
-    elements.ebayStatusText.textContent = `${status.env} / ${tokenText} / ${policyText}`;
-    elements.ebayStatusText.title = "";
-  } catch {
-    elements.ebayStatusText.textContent = "eBay 状态读取失败";
-    elements.ebayConnectButton.disabled = true;
-    elements.ebaySyncButton.disabled = true;
-  }
-}
-
-async function syncEbay() {
-  elements.ebaySyncButton.disabled = true;
-  elements.ebayStatusText.textContent = "同步中...";
-  try {
-    const result = await apiRequest("/api/sync/ebay", { method: "POST" });
-    elements.ebayStatusText.textContent = result.message || result.status;
-    await refreshActivity();
-    render();
-  } catch (error) {
-    elements.ebayStatusText.textContent = `同步失败: ${error.message}`;
-  } finally {
-    await loadEbayStatus();
-  }
 }
 
 async function archiveTask(taskKey, shoeId, action) {
@@ -610,9 +569,6 @@ function activityActionLabel(action) {
     imported: "导入",
     done: "完成待办",
     ignored: "忽略待办",
-    auth_updated: "授权",
-    sync_ok: "同步",
-    sync_error: "同步失败",
   }[action] || action || "记录";
 }
 
@@ -918,10 +874,6 @@ function bindEvents() {
   });
 
   $("#exportButton").addEventListener("click", exportData);
-  elements.ebayConnectButton.addEventListener("click", () => {
-    window.open("/api/ebay/auth/start", "_blank", "noreferrer");
-  });
-  elements.ebaySyncButton.addEventListener("click", syncEbay);
   $("#importButton").addEventListener("click", () => elements.importFile.click());
   elements.importFile.addEventListener("change", async (event) => {
     try {
@@ -942,7 +894,6 @@ async function init() {
   try {
     await load();
     if (!shoes.length) await seedData();
-    await loadEbayStatus();
   } catch {
     alert("无法连接本地后端。请用 npm start 启动 Sneaker Desk。");
   }

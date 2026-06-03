@@ -44,7 +44,6 @@ db.exec(`
     fixed_fee REAL NOT NULL DEFAULT 0,
     shipping_cost REAL NOT NULL DEFAULT 0,
     link TEXT NOT NULL DEFAULT '',
-    last_synced_at TEXT NOT NULL DEFAULT '',
     updated_at TEXT NOT NULL,
     UNIQUE (shoe_id, platform),
     FOREIGN KEY (shoe_id) REFERENCES shoes(id) ON DELETE CASCADE
@@ -75,23 +74,6 @@ db.exec(`
     raw_json TEXT NOT NULL DEFAULT '{}',
     UNIQUE (platform, external_order_id),
     FOREIGN KEY (shoe_id) REFERENCES shoes(id) ON DELETE SET NULL
-  );
-
-  CREATE TABLE IF NOT EXISTS sync_logs (
-    id INTEGER PRIMARY KEY AUTOINCREMENT,
-    platform TEXT NOT NULL,
-    action TEXT NOT NULL,
-    result TEXT NOT NULL,
-    message TEXT NOT NULL DEFAULT '',
-    created_at TEXT NOT NULL
-  );
-
-  CREATE TABLE IF NOT EXISTS auth_tokens (
-    platform TEXT PRIMARY KEY,
-    access_token TEXT NOT NULL DEFAULT '',
-    refresh_token TEXT NOT NULL DEFAULT '',
-    expires_at TEXT NOT NULL DEFAULT '',
-    updated_at TEXT NOT NULL
   );
 
   CREATE TABLE IF NOT EXISTS archived_tasks (
@@ -139,8 +121,8 @@ const insertShoe = db.prepare(`
 const upsertPlatform = db.prepare(`
   INSERT INTO platform_listings (
     shoe_id, platform, external_listing_id, external_product_id, status, price,
-    fee, fixed_fee, shipping_cost, link, last_synced_at, updated_at
-  ) VALUES (?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?)
+    fee, fixed_fee, shipping_cost, link, updated_at
+  ) VALUES (?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?)
   ON CONFLICT(shoe_id, platform) DO UPDATE SET
     external_listing_id = excluded.external_listing_id,
     external_product_id = excluded.external_product_id,
@@ -150,16 +132,11 @@ const upsertPlatform = db.prepare(`
     fixed_fee = excluded.fixed_fee,
     shipping_cost = excluded.shipping_cost,
     link = excluded.link,
-    last_synced_at = excluded.last_synced_at,
     updated_at = excluded.updated_at
 `);
 const deletePlatforms = db.prepare("DELETE FROM platform_listings WHERE shoe_id = ?");
 const deleteShoe = db.prepare("DELETE FROM shoes WHERE id = ?");
 const deleteAllShoes = db.prepare("DELETE FROM shoes");
-const insertSyncLog = db.prepare(`
-  INSERT INTO sync_logs (platform, action, result, message, created_at)
-  VALUES (?, ?, ?, ?, ?)
-`);
 const selectArchivedTasks = db.prepare("SELECT * FROM archived_tasks ORDER BY archived_at DESC");
 const upsertArchivedTask = db.prepare(`
   INSERT INTO archived_tasks (task_key, shoe_id, action, archived_at)
@@ -172,16 +149,6 @@ const selectActivityLogs = db.prepare("SELECT * FROM activity_logs ORDER BY crea
 const insertActivityLog = db.prepare(`
   INSERT INTO activity_logs (entity_type, entity_id, entity_label, action, summary, details_json, created_at)
   VALUES (?, ?, ?, ?, ?, ?, ?)
-`);
-const selectAuthToken = db.prepare("SELECT * FROM auth_tokens WHERE platform = ?");
-const upsertAuthToken = db.prepare(`
-  INSERT INTO auth_tokens (platform, access_token, refresh_token, expires_at, updated_at)
-  VALUES (?, ?, ?, ?, ?)
-  ON CONFLICT(platform) DO UPDATE SET
-    access_token = excluded.access_token,
-    refresh_token = excluded.refresh_token,
-    expires_at = excluded.expires_at,
-    updated_at = excluded.updated_at
 `);
 
 function now() {
@@ -222,7 +189,6 @@ function toCamelPlatform(row) {
     fixedFee: row.fixed_fee,
     shippingCost: row.shipping_cost,
     link: row.link,
-    lastSyncedAt: row.last_synced_at,
     updatedAt: row.updated_at,
   };
 }
@@ -259,7 +225,6 @@ function defaultPlatform(platform) {
     fixedFee: 0,
     shippingCost: 0,
     link: "",
-    lastSyncedAt: "",
     updatedAt: now(),
   };
 }
@@ -431,7 +396,6 @@ export function saveShoe(shoe, options = {}) {
         Number(platform.fixedFee || 0),
         Number(platform.shippingCost || 0),
         platform.link || "",
-        platform.lastSyncedAt || "",
         updatedAt,
       );
     }
@@ -509,18 +473,6 @@ export function replaceShoes(shoes) {
   return saved;
 }
 
-export function logSync(platform, action, result, message = "") {
-  insertSyncLog.run(platform, action, result, message, now());
-  logActivity({
-    entityType: "platform",
-    entityId: platform,
-    entityLabel: platform,
-    action: `sync_${result}`,
-    summary: `${platform} ${action}: ${message || result}`,
-    details: { platform, action, result, message },
-  });
-}
-
 export function getArchivedTasks() {
   return selectArchivedTasks.all().map((row) => ({
     taskKey: row.task_key,
@@ -543,38 +495,6 @@ export function archiveTask(task) {
     details: { taskKey: task.taskKey, shoeId: task.shoeId || "", action: task.action || "done" },
   });
   return { archived: true };
-}
-
-export function getAuthToken(platform) {
-  const row = selectAuthToken.get(platform);
-  if (!row) return null;
-  return {
-    platform: row.platform,
-    accessToken: row.access_token,
-    refreshToken: row.refresh_token,
-    expiresAt: row.expires_at,
-    updatedAt: row.updated_at,
-  };
-}
-
-export function saveAuthToken(platform, token) {
-  const existing = getAuthToken(platform);
-  upsertAuthToken.run(
-    platform,
-    token.accessToken || existing?.accessToken || "",
-    token.refreshToken || existing?.refreshToken || "",
-    token.expiresAt || existing?.expiresAt || "",
-    now(),
-  );
-  logActivity({
-    entityType: "platform",
-    entityId: platform,
-    entityLabel: platform,
-    action: "auth_updated",
-    summary: `${platform} 授权信息已更新`,
-    details: { platform, hasRefreshToken: Boolean(token.refreshToken || existing?.refreshToken) },
-  });
-  return getAuthToken(platform);
 }
 
 export { DB_PATH, PLATFORMS, DEFAULT_FEES };
